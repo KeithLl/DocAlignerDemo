@@ -1,4 +1,4 @@
-package com.keith.android.onnx
+package com.android.docaligner.onnx
 
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment

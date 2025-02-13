@@ -3,17 +3,16 @@ package com.android.docaligner
 import android.annotation.SuppressLint
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.keith.android.onnx.OnnxModel
-import com.keith.android.onnx.OnnxUtils
+import com.android.docaligner.onnx.OnnxModel
+import com.android.docaligner.onnx.OnnxUtils
 import org.opencv.android.OpenCVLoader
 
 class MainActivity : AppCompatActivity() {
-    val TYPE_ONNX_MODEL = "onnx"
+    private val TYPE_ONNX_MODEL = "onnx"
     private lateinit var onnxModel: OnnxModel
     @SuppressLint("MissingInflatedId")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,18 +31,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         // 释放资源
-        onnxModel?.release()
+        onnxModel.release()
         super.onDestroy()
     }
 
     private fun requestPermission() {
         //请求存储权限
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), 1)
-            } else {
-                decideInitByType()
-            }
+        if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), 1)
         } else {
             decideInitByType()
         }

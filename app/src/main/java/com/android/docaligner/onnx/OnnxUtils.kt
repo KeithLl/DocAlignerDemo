@@ -1,9 +1,8 @@
-package com.keith.android.onnx
+package com.android.docaligner.onnx
 
 import android.content.Context
 import android.util.Log
 import com.android.docaligner.Constants.LOG_TAG
-import com.google.gson.Gson
 import org.opencv.core.Mat
 import org.opencv.core.Size
 import org.opencv.imgcodecs.Imgcodecs
@@ -28,7 +27,7 @@ object OnnxUtils {
         Log.e(LOG_TAG, "--------print mat--name: $name--------")
         Log.e(LOG_TAG, "img: size: ${mat.size()} , type: ${mat.type()}, nativeObj: ${mat.nativeObj}")
 //        Log.e(LOG_TAG, "~ save mat ~")
-        val matPath = "${finalPath}/${name}.png"
+        val matPath = "$finalPath/${name}.png"
         Imgcodecs.imwrite(matPath, mat)
         Log.e(LOG_TAG, "--------print and save end--------")
     }

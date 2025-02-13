@@ -1,8 +1,7 @@
-package com.keith.android.onnx
+package com.android.docaligner.onnx
 
 import ai.onnxruntime.OnnxTensor
 import android.util.Log
-import androidx.compose.ui.graphics.colorspace.Rgb
 import com.android.docaligner.Constants.LOG_TAG
 import com.google.gson.Gson
 import org.opencv.core.Core

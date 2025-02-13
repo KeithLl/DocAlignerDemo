@@ -1,14 +1,8 @@
-package com.keith.android.onnx
+package com.android.docaligner.onnx
 
 import android.util.Log
-import androidx.compose.ui.graphics.colorspace.Rgb
 import com.android.docaligner.Constants.LOG_TAG
-import org.opencv.core.Core
-import org.opencv.core.CvType
 import org.opencv.core.Mat
-import org.opencv.core.Scalar
-import org.opencv.core.Size
-import org.opencv.imgproc.Imgproc
 
 object PreProcess {
     private fun transposeAndNormalize(img: Mat): FloatArray {
