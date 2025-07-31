@@ -3,10 +3,13 @@ package com.android.docaligner
 import android.annotation.SuppressLint
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
+import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.android.docaligner.Constants.LOG_TAG
 import com.android.docaligner.onnx.OnnxModel
 import com.android.docaligner.onnx.OnnxUtils
 import org.opencv.android.OpenCVLoader
@@ -14,6 +17,9 @@ import org.opencv.android.OpenCVLoader
 class MainActivity : AppCompatActivity() {
     private val TYPE_ONNX_MODEL = "onnx"
     private lateinit var onnxModel: OnnxModel
+
+    private var mTvDemoBtn: TextView? = null
+
     @SuppressLint("MissingInflatedId")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -25,6 +31,12 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
+        mTvDemoBtn = findViewById(R.id.tv_demo_btn)
+
+        mTvDemoBtn?.setOnClickListener {
+            Log.e(LOG_TAG, "====== click btn =======")
+            onnxModel.handleOnnx()
+        }
         requestPermission()
     }
 
@@ -81,6 +93,5 @@ class MainActivity : AppCompatActivity() {
         }
 
         onnxModel = OnnxModel(this)
-        onnxModel.handleOnnx()
     }
 }
