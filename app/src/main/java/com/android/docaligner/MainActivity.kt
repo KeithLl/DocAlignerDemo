@@ -1,7 +1,6 @@
 package com.android.docaligner
 
-import android.annotation.SuppressLint
-import android.os.Build
+import com.pic.aligner.PicAligner
 import android.os.Bundle
 import android.util.Log
 import android.widget.TextView
@@ -9,18 +8,18 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.android.docaligner.Constants.LOG_TAG
-import com.android.docaligner.onnx.OnnxModel
-import com.android.docaligner.onnx.OnnxUtils
+import com.pic.consts.Constants
+import com.pic.onnx.OnnxUtils
 import org.opencv.android.OpenCVLoader
+import java.io.File
+import kotlin.math.log
 
 class MainActivity : AppCompatActivity() {
     private val TYPE_ONNX_MODEL = "onnx"
-    private lateinit var onnxModel: OnnxModel
 
     private var mTvDemoBtn: TextView? = null
 
-    @SuppressLint("MissingInflatedId")
+    //    @SuppressLint("MissingInflatedId")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -33,9 +32,29 @@ class MainActivity : AppCompatActivity() {
 
         mTvDemoBtn = findViewById(R.id.tv_demo_btn)
 
+        Log.e(Constants.LOG_TAG, "File.pathSeparator : ${File.separator}")
         mTvDemoBtn?.setOnClickListener {
-            Log.e(LOG_TAG, "====== click btn =======")
-            onnxModel.handleOnnx()
+            val startTime = System.currentTimeMillis()
+            val originPath = OnnxUtils.getParentDir() + File.separator + "7.png"
+            val savedPath = OnnxUtils.getParentDir() + File.separator + "saved_result.png"
+            PicAligner.getInstance(baseContext)
+                .straightenImage(originPath, savedPath, object : PicAligner.Callback {
+                    override fun onSuccess(resultPaths: String) {
+                        Log.e(Constants.LOG_TAG, resultPaths)
+                        val endTime = System.currentTimeMillis()
+                        val duration = endTime - startTime
+                        Log.e(Constants.LOG_TAG, "duration : $duration")
+                    }
+
+                    override fun onError(message: String) {
+                        Log.e(Constants.LOG_TAG, message)
+                    }
+
+                    override fun onProgress(step: String, progress: Float) {
+                        Log.e(Constants.LOG_TAG, step + progress)
+                    }
+
+                })
         }
         requestPermission()
     }
@@ -43,7 +62,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         // 释放资源
-        onnxModel.release()
+        PicAligner.release()
         super.onDestroy()
     }
 
@@ -57,9 +76,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
+        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
     ) {
         if (requestCode == 1) {
             if (grantResults.isNotEmpty() && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
@@ -85,13 +102,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initOnnxModel() {
-        try {
-            OnnxUtils.initParentDir(context = this)
-            OpenCVLoader.initLocal()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-
-        onnxModel = OnnxModel(this)
+        // 初始化OpenCV
+        Log.e(Constants.LOG_TAG, "initOnnxModel")
+        OpenCVLoader.initLocal()
+        OnnxUtils.initParentDir(context = this)
     }
 }

@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "DocAlignerDemo"
 include(":app")
+include(":pic_aligner")
