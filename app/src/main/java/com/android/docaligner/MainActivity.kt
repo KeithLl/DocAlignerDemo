@@ -34,27 +34,26 @@ class MainActivity : AppCompatActivity() {
 
         Log.e(Constants.LOG_TAG, "File.pathSeparator : ${File.separator}")
         mTvDemoBtn?.setOnClickListener {
-            val startTime = System.currentTimeMillis()
-            val originPath = OnnxUtils.getParentDir() + File.separator + "7.png"
-            val savedPath = OnnxUtils.getParentDir() + File.separator + "saved_result.png"
-            PicAligner.getInstance(baseContext)
-                .straightenImage(originPath, savedPath, object : PicAligner.Callback {
-                    override fun onSuccess(resultPaths: String) {
-                        Log.e(Constants.LOG_TAG, resultPaths)
-                        val endTime = System.currentTimeMillis()
-                        val duration = endTime - startTime
-                        Log.e(Constants.LOG_TAG, "duration : $duration")
-                    }
+            for (i in 10..11) {
+                val fileName = "$i.png"
+                val originPath = OnnxUtils.getParentDir() + File.separator + fileName
+                val savedPath = OnnxUtils.getParentDir() + File.separator + "saved_" + fileName
+                PicAligner.getInstance(baseContext)
+                    .straightenImage(originPath, savedPath, object : PicAligner.Callback {
+                        override fun onSuccess(resultPaths: String) {
+                            Log.e(Constants.LOG_TAG, resultPaths)
+                        }
 
-                    override fun onError(message: String) {
-                        Log.e(Constants.LOG_TAG, message)
-                    }
+                        override fun onError(message: String) {
+                            Log.e(Constants.LOG_TAG, message)
+                        }
 
-                    override fun onProgress(step: String, progress: Float) {
-                        Log.e(Constants.LOG_TAG, step + progress)
-                    }
+                        override fun onProgress(step: String, progress: Float) {
+                            Log.e(Constants.LOG_TAG, step + progress)
+                        }
 
-                })
+                    })
+            }
         }
         requestPermission()
     }

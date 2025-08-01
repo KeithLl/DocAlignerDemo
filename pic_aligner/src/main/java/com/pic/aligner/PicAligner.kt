@@ -1,13 +1,10 @@
 package com.pic.aligner
 
 import android.content.Context
-import android.util.Log
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import android.annotation.SuppressLint
-import com.google.gson.Gson
-import com.pic.consts.Constants
 import com.pic.onnx.OnnxUtils
 import com.pic.onnx.PostProcess
 import com.pic.onnx.PreProcess
@@ -20,7 +17,6 @@ import kotlin.math.sqrt
 
 class PicAligner private constructor(context: Context) {
     companion object {
-        const val LOG_TAG = "com.pic.aligner.PicAligner"
 
         @SuppressLint("StaticFieldLeak")
         @Volatile
@@ -36,7 +32,6 @@ class PicAligner private constructor(context: Context) {
                     if (instance == null) {
                         // 检查OpenCV初始化状态（与OnnxModel.initOnnxModel()保持一致）
                         if (!OpenCVLoader.initLocal()) {
-                            Log.e(LOG_TAG, "OpenCV initialization failed!")
                             throw IllegalStateException("OpenCV初始化失败")
                         }
                         instance = PicAligner(context)
@@ -63,6 +58,7 @@ class PicAligner private constructor(context: Context) {
     private var session2: OrtSession  // 轮廓检测模型2
     private var context = context.applicationContext
     private val imageSizeInfer = Pair(256, 256)
+    private val expectSize = 4
 
     init {
         try {
@@ -75,73 +71,9 @@ class PicAligner private constructor(context: Context) {
             // 3. 加载第二个模型（轮廓检测2）
             session2 = loadModel(MODEL_NAME_LCNET)
 
-            Log.e(LOG_TAG, "com.pic.aligner.PicAligner init success: ${session1}, $session2")
         } catch (e: Exception) {
-            Log.e(LOG_TAG, "com.pic.aligner.PicAligner init error", e)
             throw RuntimeException("模型初始化失败", e)
         }
-    }
-
-    /**
-     * 模型加载通用方法（抽取OnnxModel中的模型加载逻辑）
-     */
-    private fun loadModel(modelName: String): OrtSession {
-        val modelStream = context.assets.open(modelName)
-        val modelBytes = ByteArray(modelStream.available())
-        modelStream.read(modelBytes)
-        return environment.createSession(modelBytes)
-    }
-
-    /**
-     * 图像处理主方法（仿照OnnxModel.handleOnnx()流程）
-     */
-
-    private fun processImage(
-        originalMat: Mat, callback: Callback?
-    ): Array<Array<Double>> {
-        try {
-            // 1. 读取图片（复用OnnxUtils的路径处理逻辑）
-            if (originalMat.empty()) {
-                callback?.onError("读取图片失败")
-                return emptyArray()
-            }
-            callback?.onProgress("图片读取完成", 0.1f)
-
-            // 2. RBG2BGR
-            val processMat = OnnxUtils.rgb2bgr(originalMat)
-            callback?.onProgress("图片转换完成", 0.2f)
-
-            // 3. 预处理（仿照OnnxModel的preprocess流程）
-            val preprocessedData = preprocessImage(processMat)
-            callback?.onProgress("图像预处理完成", 0.3f)
-
-            // 4. 轮廓检测模型推理（对应OnnxModel.runInference）
-            val contourResult = runModelInference(session2, preprocessedData)
-            callback?.onProgress("轮廓模型推理完成", 0.4f)
-
-            // 5. 轮廓后处理（仿照OnnxModel.postProcess）
-            val contours = postProcessContour(
-                contourResult, Pair(originalMat.width(), originalMat.height())
-            )
-            callback?.onProgress("轮廓结果处理完成", 0.5f)
-            return contours
-        } catch (e: Exception) {
-            Log.e(LOG_TAG, "processImage error", e)
-            callback?.onError("处理图片失败: ${e.message}")
-            return emptyArray()
-        } finally {
-            Log.e(LOG_TAG, "====== processImage end =======")
-        }
-    }
-
-    private fun getPoints(resultData: Array<Array<Double>>): List<Point> {
-        // 从result中获取点坐标
-        val points = mutableListOf<Point>()
-        for (point in resultData) {
-            points.add(Point(point[0], point[1]))
-        }
-
-        return points
     }
 
     /**
@@ -155,8 +87,11 @@ class PicAligner private constructor(context: Context) {
         val originalMat = OnnxUtils.readImage(inputImagePath)
 
         // 2. 处理图片,识别顶点坐标
-        val resultData = processImage(originalMat, callback)
-        Log.e(LOG_TAG, "轮廓处理成功:" + Gson().toJson(resultData))
+        val resultData = getImgPointsArray(originalMat, callback)
+        if (resultData.isEmpty()) {
+            callback?.onError("轮廓检测为空")
+            return
+        }
 
         // 3. 从result中获取点坐标List
         val points = getPoints(resultData)
@@ -176,6 +111,7 @@ class PicAligner private constructor(context: Context) {
         )
         callback?.onProgress("绘制轮廓完成", 0.8f)
 
+        // 6. 保存图片
         val saveResult = OnnxUtils.saveImage(outputImagePath, originalMat)
         callback?.onProgress("保存图片结果", 0.9f)
         if (saveResult) {
@@ -194,8 +130,12 @@ class PicAligner private constructor(context: Context) {
         // 1. 读取图片
         val originalMat = OnnxUtils.readImage(inputImagePath)
         // 2. 处理图片,识别顶点坐标
-        val resultData = processImage(originalMat, callback)
-        Log.e(LOG_TAG, "轮廓处理成功:" + Gson().toJson(resultData))
+        // 使用第一个模型进行轮廓检测,如果数据为空则使用第二个模型进行检测
+        val resultData = getImgPointsArray(originalMat, callback)
+        if (resultData.isEmpty()) {
+            callback?.onError("轮廓检测为空")
+            return
+        }
 
         // 3. 从result中获取点坐标List
         val points = getPoints(resultData)
@@ -206,21 +146,21 @@ class PicAligner private constructor(context: Context) {
             return
         }
 
-        // 对多边形顶点进行排序（按顺时针方向）
+        // 5. 对多边形顶点进行排序（按顺时针方向）
         val sortedPoints = sortPolygonPoints(points)
 
-        // 计算原始多边形的实际宽度和高度（保持宽高比）
+        // 6. 计算原始多边形的实际宽度和高度（保持宽高比）
         val width = calculateDistance(sortedPoints[0], sortedPoints[1]) // 上边长作为宽度
         val height = calculateDistance(sortedPoints[1], sortedPoints[2]) // 右边长作为高度
 
         // 检查宽高有效性
         if (width <= 0 || height <= 0) {
-            Log.e(Constants.LOG_TAG, "无效的多边形尺寸，无法进行透视变换")
+            callback?.onError("多边形尺寸无效，无法进行透视变换")
             return
         }
         callback?.onProgress("获取多边形宽高", 0.7f)
 
-        // 定义目标矩形的四个顶点（保持原始宽高比）
+        // 7. 定义目标矩形的四个顶点（保持原始宽高比）
         val dstPoints = listOf(
             Point(0.0, 0.0),
             Point(width, 0.0),
@@ -232,7 +172,7 @@ class PicAligner private constructor(context: Context) {
         val srcMat = MatOfPoint2f(*sortedPoints.toTypedArray())
         val dstMat = MatOfPoint2f(*dstPoints.toTypedArray())
 
-        // 计算透视变换矩阵
+        // 8. 计算透视变换矩阵
         val perspectiveMatrix = Imgproc.getPerspectiveTransform(srcMat, dstMat)
 
         // 应用透视变换，拉正图像（使用原始宽高比）
@@ -245,7 +185,7 @@ class PicAligner private constructor(context: Context) {
         )
         callback?.onProgress("透视变换并拉正图像", 0.8f)
 
-        // 保存拉正后的图像
+        // 9. 保存拉正后的图像
         val saveResult = OnnxUtils.saveImage(outputImagePath, straightenedMat)
         callback?.onProgress("保存图片结果", 0.9f)
         if (saveResult) {
@@ -256,6 +196,87 @@ class PicAligner private constructor(context: Context) {
     }
 
     // 以下为私有辅助方法（均仿照OnnxModel和OnnxUtils中的实现）
+    /**
+     * 模型加载通用方法（抽取OnnxModel中的模型加载逻辑）
+     */
+    private fun loadModel(modelName: String): OrtSession {
+        val modelStream = context.assets.open(modelName)
+        val modelBytes = ByteArray(modelStream.available())
+        modelStream.read(modelBytes)
+        return environment.createSession(modelBytes)
+    }
+
+    /**
+     * 图像处理主方法（仿照OnnxModel.handleOnnx()流程）
+     */
+
+    private fun processImage(
+        session: OrtSession,
+        originalMat: Mat, callback: Callback?
+    ): Array<Array<Double>> {
+        try {
+            // 1. 读取图片（复用OnnxUtils的路径处理逻辑）
+            if (originalMat.empty()) {
+                callback?.onError("读取图片失败")
+                return emptyArray()
+            }
+            callback?.onProgress("图片读取完成", 0.1f)
+
+            // 2. RBG2BGR
+            val processMat = OnnxUtils.rgb2bgr(originalMat)
+            callback?.onProgress("图片转换完成", 0.2f)
+
+            // 3. 预处理（仿照OnnxModel的preprocess流程）
+            val preprocessedData = preprocessImage(processMat)
+            callback?.onProgress("图像预处理完成", 0.3f)
+
+            // 4. 轮廓检测模型推理（对应OnnxModel.runInference）
+            val contourResult = runModelInference(session, preprocessedData)
+            callback?.onProgress("轮廓模型推理完成", 0.4f)
+
+            // 5. 轮廓后处理（仿照OnnxModel.postProcess）
+            val contours = postProcessContour(
+                contourResult, Pair(originalMat.width(), originalMat.height())
+            )
+            callback?.onProgress("轮廓结果处理完成", 0.5f)
+            return contours
+        } catch (e: Exception) {
+            callback?.onError("处理图片失败: ${e.message}")
+            return emptyArray()
+        } finally {
+        }
+    }
+
+
+    // 获取图片顶点坐标
+    private fun getImgPointsArray(
+        originalMat: Mat,
+        callback: Callback?,
+    ): Array<Array<Double>> {
+        val resultData: Array<Array<Double>>
+        val resultData1 = processImage(session1, originalMat, callback)
+        if (resultData1.isNotEmpty() && resultData1.size == expectSize) {
+            resultData = resultData1
+        } else {
+            val resultData2 = processImage(session2, originalMat, callback)
+            resultData = if (resultData2.isNotEmpty() && resultData2.size == expectSize) {
+                resultData2
+            } else {
+                if (resultData1.size > resultData2.size) resultData1 else resultData2
+            }
+        }
+        return resultData
+    }
+
+    private fun getPoints(resultData: Array<Array<Double>>): List<Point> {
+        // 从result中获取点坐标
+        val points = mutableListOf<Point>()
+        for (point in resultData) {
+            points.add(Point(point[0], point[1]))
+        }
+
+        return points
+    }
 
     // 辅助函数：计算两点间距离
     private fun calculateDistance(p1: Point, p2: Point): Double {
