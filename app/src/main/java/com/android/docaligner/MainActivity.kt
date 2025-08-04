@@ -34,7 +34,7 @@ class MainActivity : AppCompatActivity() {
 
         Log.e(Constants.LOG_TAG, "File.pathSeparator : ${File.separator}")
         mTvDemoBtn?.setOnClickListener {
-            for (i in 10..11) {
+            for (i in 1..10) {
                 val fileName = "$i.png"
                 val originPath = OnnxUtils.getParentDir() + File.separator + fileName
                 val savedPath = OnnxUtils.getParentDir() + File.separator + "saved_" + fileName
